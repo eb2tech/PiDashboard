@@ -21,7 +21,7 @@ public partial class DashboardWindow : Window
         ArgumentNullException.ThrowIfNull(e);
 
         // Handle adaptive card actions here. Log the action title.
-        Logger.TryGet(LogEventLevel.Information, "PiDashboard")?.Log(this, $"Adaptive action invoked: {e?.Action?.Title}");
+        Logger.TryGet(LogEventLevel.Information, "PiDashboard")?.Log(this, $"Adaptive action invoked: {e.Action.Title}");
 
         if (e.Action is AdaptiveOpenUrlAction openUrlAction)
         {
