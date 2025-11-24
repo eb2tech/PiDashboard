@@ -1,0 +1,12 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ac="using:AdaptiveCards.Rendering.Avalonia"
+        xmlns:vm="using:PiDashboard.ViewModels"
+        x:Class="PiDashboard.DashboardWindow"
+        x:DataType="vm:CardViewModel"
+        Title="Pi Dashboard" Width="800" Height="600">
+    <StackPanel>
+        <ac:AdaptiveCardView Card="{Binding Card}" Width="600"
+                             Action="OnAdaptiveAction"/>
+    </StackPanel>
+</Window>
