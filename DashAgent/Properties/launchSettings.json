@@ -1,0 +1,32 @@
+{
+  "profiles": {
+    "DashAgent": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:62075;http://localhost:62076"
+    }
+  },
+  "configurations": [
+    {
+        "name": ".NET Remote Launch - Self-contained",
+        "type": "coreclr",
+        "request": "launch",
+        "program": "~/sample/sample",
+        "args": [],
+        "cwd": "~/sample",
+        "stopAtEntry": false,
+        "console": "internalConsole",
+        "pipeTransport": {
+            "pipeCwd": "${workspaceRoot}",
+            "pipeProgram": "ssh",
+            "pipeArgs": [
+                "pi@raspberrypi"
+            ],
+            "debuggerPath": "~/vsdbg/vsdbg"
+        }
+    }
+  ]
+}
