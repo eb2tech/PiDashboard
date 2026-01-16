@@ -4,7 +4,7 @@ using DashAgent.Parsers;
 
 namespace DashAgent
 {
-    internal class PiController
+    internal class PiController(ILogger logger)
     {
         // Check your specific OS/device for the exact path
         private const string BacklightPath = "/sys/class/backlight/11-0045";
@@ -15,7 +15,7 @@ namespace DashAgent
         private ProcStatParser.CpuUsageData? _lastCpuData;
         private DateTime _lastCpuReadTime;
 
-        public static string DeviceId => throw new NotImplementedException();
+        public static string DeviceId => Environment.MachineName;
 
         public int GetMaxBrightness()
         {
@@ -41,7 +41,7 @@ namespace DashAgent
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error reading brightness: {ex.Message}");
+                    logger.LogError(ex, "Error reading brightness");
                 }
             }
 
@@ -60,7 +60,7 @@ namespace DashAgent
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error setting brightness: {ex.Message}");
+                logger.LogError(ex, "Error setting brightness to {Brightness}", value);
             }
         }
 
@@ -72,10 +72,8 @@ namespace DashAgent
 
         public static bool IsRunningOnPi()
         {
-            // Detect whether we're running on a Raspberry Pi or not.
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                Console.WriteLine("Not running on Linux (not a Raspberry Pi). Exiting.");
                 return false;
             }
 
@@ -145,7 +143,7 @@ namespace DashAgent
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error reading CPU temperature: {ex.Message}");
+                    logger.LogError(ex, "Error reading CPU temperature");
                 }
             }
 
@@ -202,7 +200,7 @@ namespace DashAgent
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error reading CPU usage: {ex.Message}");
+                logger.LogError(ex, "Error reading CPU usage");
                 return 0;
             }
         }
@@ -242,7 +240,7 @@ namespace DashAgent
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error reading memory usage: {ex.Message}");
+                logger.LogError(ex, "Error reading memory usage");
                 return 0;
             }
         }

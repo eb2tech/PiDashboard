@@ -4,12 +4,12 @@ using MQTTnet;
 
 namespace DashAgent;
 
-public class PiStateUpdater(IConfiguration configuration) : BackgroundService
+internal class PiStateUpdater(IConfiguration configuration, ILogger<PiStateUpdater> logger) : BackgroundService
 {
-    private PiController PiController => field ??= new PiController();
+    private PiController PiController => field ??= new PiController(logger);
     private PiModel PiModel => field ??= new PiModel();
     
-    private readonly string _mqttServer = configuration["Mqtt:Server"] ?? "homeassistant2.local";
+    private readonly string _mqttServer = configuration["Mqtt:Server"] ?? string.Empty;
     private readonly string _mqttUsername = configuration["Mqtt:Username"] ?? string.Empty;
     private readonly string _mqttPassword = configuration["Mqtt:Password"] ?? string.Empty;
 
@@ -21,7 +21,11 @@ public class PiStateUpdater(IConfiguration configuration) : BackgroundService
                                                               .WithCredentials(_mqttUsername, _mqttPassword)
                                                               .Build();
 
-        await mqttClient.ConnectAsync(mqttClientOptions, stoppingToken);
+        var result = await mqttClient.ConnectAsync(mqttClientOptions, stoppingToken);
+        if (!mqttClient.IsConnected)
+        {
+            logger.LogError("MQTT Client connected result: {ResultCode}, {Reason}", result.ResultCode, result.ReasonString);
+        }
 
         await PublishDiscovery(mqttClient);
         
@@ -48,26 +52,28 @@ public class PiStateUpdater(IConfiguration configuration) : BackgroundService
             ["brightness"] = piModel.Brightness
         };
 
+        var topicPrefix = "raspi/" + PiController.DeviceId;
+
         var messages = new[]
         {
             new MqttApplicationMessageBuilder()
-                .WithTopic("raspi/backlight/state")
+                .WithTopic(topicPrefix+"/backlight/state")
                 .WithPayload(backlightState.ToJsonString())
                 .Build(),
             new MqttApplicationMessageBuilder()
-                .WithTopic("raspi/backlight/brightness/state")
+                .WithTopic(topicPrefix+"/backlight/brightness/state")
                 .WithPayload(piModel.Brightness.ToString())
                 .Build(),
             new MqttApplicationMessageBuilder()
-                .WithTopic("raspi/cpu/usage")
+                .WithTopic(topicPrefix+"/cpu/usage")
                 .WithPayload(piModel.CpuUsage.ToString())
                 .Build(),
             new MqttApplicationMessageBuilder()
-                .WithTopic("raspi/cpu/temperature")
+                .WithTopic(topicPrefix+"/cpu/temperature")
                 .WithPayload(piModel.CpuTemp.ToString())
                 .Build(),
             new MqttApplicationMessageBuilder()
-                .WithTopic("raspi/memory/usage")
+                .WithTopic(topicPrefix+"/memory/usage")
                 .WithPayload(piModel.MemoryUsage.ToString())
                 .Build()
         };
@@ -77,83 +83,95 @@ public class PiStateUpdater(IConfiguration configuration) : BackgroundService
             await mqttClient.PublishAsync(message);
         }
 
-        Console.WriteLine($"Published state - Brightness: {piModel.Brightness}, IsOn: {piModel.IsOn}, CPU: {piModel.CpuUsage}%, Temp: {piModel.CpuTemp}°C, Memory: {piModel.MemoryUsage}%");
+        logger.LogDebug("Published state - Brightness: {Brightness}, IsOn: {IsOn}, CPU: {CpuUsage}%, Temp: {CpuTemp}°C, Memory: {MemoryUsage}%", 
+            piModel.Brightness, piModel.IsOn, piModel.CpuUsage, piModel.CpuTemp, piModel.MemoryUsage);
     }
 
-    private static async Task PublishDiscovery(IMqttClient mqttClient)
+    private async Task PublishDiscovery(IMqttClient mqttClient)
     {
+        var topicPrefix = "raspi/" + PiController.DeviceId;
+
         var root = new JsonObject
-        {
-            ["dev"] = new JsonObject
-            {
-                ["ids"] = "raspi_01",
-                ["name"] = "Raspberry Pi",
-                ["mf"] = "Raspberry Pi Foundation",
-                ["mdl"] = "Raspberry Pi"
-            },
-            ["o"] = new JsonObject
-            {
-                ["name"] = "raspi2mqtt",
-                ["sw"] = "1.0",
-                ["url"] = "https://example.local"
-            },
-            ["cmps"] = new JsonObject
-            {
-                ["raspi_backlight"] = new JsonObject
-                {
-                    ["p"] = "light",
-                    ["unique_id"] = "raspi_backlight_01",
-                    ["cmd_t"] = "raspi/backlight/set",
-                    ["stat_t"] = "raspi/backlight/state",
-                    ["bri_cmd_t"] = "raspi/backlight/brightness/set",
-                    ["bri_stat_t"] = "raspi/backlight/brightness/state",
-                    ["schema"] = "json",
-                    ["brightness"] = true
-                },
-                ["cpu_usage"] = new JsonObject
-                {
-                    ["p"] = "sensor",
-                    ["unique_id"] = "raspi_cpu_usage_01",
-                    ["stat_t"] = "raspi/cpu/usage",
-                    ["unit_of_measurement"] = "%",
-                    ["device_class"] = "power_factor",
-                    ["state_class"] = "measurement"
-                },
-                ["cpu_temperature"] = new JsonObject
-                {
-                    ["p"] = "sensor",
-                    ["unique_id"] = "raspi_cpu_temp_01",
-                    ["stat_t"] = "raspi/cpu/temperature",
-                    ["unit_of_measurement"] = "°C",
-                    ["device_class"] = "temperature",
-                    ["state_class"] = "measurement"
-                },
-                ["memory_usage"] = new JsonObject
-                {
-                    ["p"] = "sensor",
-                    ["unique_id"] = "raspi_memory_usage_01",
-                    ["stat_t"] = "raspi/memory/usage",
-                    ["unit_of_measurement"] = "%",
-                    ["device_class"] = "power_factor",
-                    ["state_class"] = "measurement"
-                }
-            }
-        };
+                   {
+                       ["dev"] = new JsonObject
+                                 {
+                                     ["ids"] = PiController.DeviceId,
+                                     ["name"] = "Raspberry Pi w/Display",
+                                     ["mf"] = "Raspberry Pi Foundation",
+                                     ["mdl"] = PiController.DeviceId
+                                 },
+                       ["o"] = new JsonObject
+                               {
+                                   ["name"] = "raspi2mqtt",
+                                   ["sw"] = "1.0",
+                                   ["url"] = "https://example.local"
+                               },
+                       ["cmps"] = new JsonObject
+                                  {
+                                      ["raspi_backlight"] = new JsonObject
+                                                            {
+                                                                ["p"] = "light",
+                                                                ["unique_id"] = PiController.DeviceId + "_backlight_01",
+                                                                ["cmd_t"] = topicPrefix + "/backlight/set",
+                                                                ["stat_t"] = topicPrefix + "/backlight/state",
+                                                                ["bri_cmd_t"] = topicPrefix + "/backlight/brightness/set",
+                                                                ["bri_stat_t"] = topicPrefix + "/backlight/brightness/state",
+                                                                ["schema"] = "json",
+                                                                ["brightness"] = true,
+                                                                ["name"] = "Backlight"
+                                                            },
+                                      ["cpu_usage"] = new JsonObject
+                                                      {
+                                                          ["p"] = "sensor",
+                                                          ["unique_id"] = "raspi_cpu_usage_01",
+                                                          ["stat_t"] = topicPrefix + "/cpu/usage",
+                                                          ["unit_of_measurement"] = "%",
+                                                          ["state_class"] = "measurement",
+                                                          ["name"] = "CPU Usage"
+                                                      },
+                                      ["cpu_temperature"] = new JsonObject
+                                                            {
+                                                                ["p"] = "sensor",
+                                                                ["unique_id"] = "raspi_cpu_temp_01",
+                                                                ["stat_t"] = topicPrefix + "/cpu/temperature",
+                                                                ["unit_of_measurement"] = "°C",
+                                                                ["device_class"] = "temperature",
+                                                                ["state_class"] = "measurement",
+                                                                ["name"] = "CPU Temperature"
+                                                            },
+                                      ["memory_usage"] = new JsonObject
+                                                         {
+                                                             ["p"] = "sensor",
+                                                             ["unique_id"] = "raspi_memory_usage_01",
+                                                             ["stat_t"] = topicPrefix + "/memory/usage",
+                                                             ["unit_of_measurement"] = "%",
+                                                             ["state_class"] = "measurement",
+                                                             ["name"] = "Memory Usage"
+                                                         }
+                                  }
+                   };
 
         var json = root.ToJsonString(new JsonSerializerOptions
                                      {
                                          WriteIndented = false
                                      });
 
+        //var clearConfigMessage = new MqttApplicationMessageBuilder()
+        //                         .WithTopic("homeassistant/device/" + PiController.DeviceId + "/config")
+        //                         .WithPayload(string.Empty)
+        //                         .Build();
+
+        //await mqttClient.PublishAsync(clearConfigMessage);
+
         var message = new MqttApplicationMessageBuilder()
-            .WithTopic("homeassistant/device/raspi_01/config")
+            .WithTopic("homeassistant/device/" + PiController.DeviceId + "/config")
             .WithPayload(json)
             .WithRetainFlag()
             .Build();
 
         await mqttClient.PublishAsync(message);
 
-        Console.WriteLine($"Published discovery to MQTT: {json}");
+        logger.LogInformation("Published MQTT discovery configuration for device " + PiController.DeviceId);
     }
 
     private void Poll()
