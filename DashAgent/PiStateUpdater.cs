@@ -4,17 +4,23 @@ using MQTTnet;
 
 namespace DashAgent;
 
-public class PiStateUpdater : BackgroundService
+public class PiStateUpdater(IConfiguration configuration) : BackgroundService
 {
     private PiController PiController => field ??= new PiController();
     private PiModel PiModel => field ??= new PiModel();
+    
+    private readonly string _mqttServer = configuration["Mqtt:Server"] ?? "homeassistant2.local";
+    private readonly string _mqttUsername = configuration["Mqtt:Username"] ?? string.Empty;
+    private readonly string _mqttPassword = configuration["Mqtt:Password"] ?? string.Empty;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var mqttFactory = new MqttClientFactory();
         using var mqttClient = mqttFactory.CreateMqttClient();
-        var mqttClientOptions = new MqttClientOptionsBuilder().WithTcpServer("homeassistant2.local")
+        var mqttClientOptions = new MqttClientOptionsBuilder().WithTcpServer(_mqttServer)
+                                                              .WithCredentials(_mqttUsername, _mqttPassword)
                                                               .Build();
+
         await mqttClient.ConnectAsync(mqttClientOptions, stoppingToken);
 
         await PublishDiscovery(mqttClient);

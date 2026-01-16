@@ -12,6 +12,7 @@ Console.WriteLine($"Hello, World! Running on Raspberry Pi.");
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<PiController>();
+builder.Services.AddHostedService<PiStateUpdater>();
 
 var app = builder.Build();
 
