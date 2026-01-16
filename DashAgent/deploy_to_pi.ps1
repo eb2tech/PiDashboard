@@ -7,11 +7,11 @@ if (-Not (Test-Path $publishDir)) {
 }
 
 Write-Host "Copying files to Raspberry Pi..."
-# ssh pi@pikiosk.local "sudo systemctl stop dashagent"
-# ssh pi@pikiosk.local "rm -rf /home/pi/dev/dashagent/"
+ssh pi@pikiosk.local "sudo systemctl stop dashagent"
+ssh pi@pikiosk.local "rm -rf /home/pi/dev/dashagent/"
 scp -r "$publishDir\*" $targetDir
 ssh pi@pikiosk.local "sudo chmod +x /home/pi/dev/dashagent/DashAgent"
-# ssh pi@pikiosk.local "sudo systemctl start dashagent"
+ssh pi@pikiosk.local "sudo systemctl start dashagent"
 
 Write-Host "Done."
 
